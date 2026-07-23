@@ -39,16 +39,23 @@ LANGUAGES = {
 }
 
 async def translate_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Проверяем, есть ли реплай на сообщение другого человека
+    # Проверяем, есть ли реплай на сообщение
     if not update.message.reply_to_message or not update.message.reply_to_message.text:
         await update.message.reply_text("Сделай реплай на сообщение и напиши /tr!")
         return
 
+    # Берем текст сообщения, которое нужно перевести
+    original_text = update.message.reply_to_message.text
+    
+    # Обрезаем текст для кнопки, если он слишком длинный (Telegram разрешает до 64 байт в callback_data)
+    safe_text = original_text[:30].replace("_", " ")
+
     keyboard = []
     row = []
     for code, (label, _) in LANGUAGES.items():
-        # Создаем кнопку, которая вызывает callback
-        row.append(InlineKeyboardButton(label, callback_data=f"tr_{code}"))
+        # Зашиваем код языка и сам текст прямо в кнопку!
+        callback_data = f"tr_{code}_{safe_text}"
+        row.append(InlineKeyboardButton(label, callback_data=callback_data))
         if len(row) == 3:
             keyboard.append(row)
             row = []
@@ -66,21 +73,25 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    if not query.data.startswith("tr_"):
+    data_parts = query.data.split("_", 2)
+    if len(data_parts) < 2 or data_parts[0] != "tr":
         return
 
-    code = query.data.split("_")[1]
+    code = data_parts[1]
     if code not in LANGUAGES:
         return
 
-    # Берем сообщение, на которое изначально была вызвана команда /tr
+    # Достаем точный исходный текст из реплая к сообщению, на которое вызвали /tr
     bot_message = query.message
-    if not bot_message.reply_to_message or not bot_message.reply_to_message.reply_to_message:
-        await query.edit_message_text("Ошибка: исходное сообщение не найдено.")
-        return
+    if bot_message.reply_to_message and bot_message.reply_to_message.reply_to_message:
+        original_text = bot_message.reply_to_message.reply_to_message.text
+    else:
+        # Запасной вариант, если ланцюжок не найден — берем из callback_data
+        original_text = data_parts[2] if len(data_parts) > 2 else ""
 
-    # Достаем текст именно того сообщения, на которое ответили реплаем
-    original_text = bot_message.reply_to_message.reply_to_message.text
+    if not original_text:
+        await query.edit_message_text("Ошибка: текст для перевода не найден.")
+        return
 
     target_lang = LANGUAGES[code][1]
     lang_label = LANGUAGES[code][0]
@@ -107,6 +118,6 @@ if __name__ == '__main__':
         application.add_handler(CommandHandler("tr", translate_menu))
         application.add_handler(CallbackQueryHandler(button_handler))
 
-        print("Бот-переводчик с кнопками успешно запущен!")
+        print("Бот-переводчик с надежными кнопками успешно запущен!")
         application.run_polling()
-                         
+    

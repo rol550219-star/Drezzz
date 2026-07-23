@@ -25,17 +25,18 @@ def run_web_server():
     server = HTTPServer(("0.0.0.0", port), SimpleHandler)
     server.serve_forever()
 
-# Словарь доступных языков
+# Словарь доступных языков с кодом в скобках
 LANGUAGES = {
-    "en": ("🇬🇧 English", "english"),
-    "uk": ("🇺🇦 Українська", "ukrainian"),
-    "ru": ("🇷🇺 Русский", "russian"),
-    "pl": ("🇵🇱 Polski", "polish"),
-    "de": ("🇩🇪 Deutsch", "german"),
-    "es": ("🇪🇸 Español", "spanish"),
-    "fr": ("🇫🇷 Français", "french"),
-    "kk": ("🇰🇿 Қазақша", "kazakh"),
-    "uz": ("🇺🇿 O'zbekcha", "uzbek")
+    "en": ("🇬🇧 English (EN)", "english"),
+    "uk": ("🇺🇦 Українська (UK)", "ukrainian"),
+    "ru": ("🇷🇺 Русский (RU)", "russian"),
+    "pl": ("🇵🇱 Polski (PL)", "polish"),
+    "de": ("🇩🇪 Deutsch (DE)", "german"),
+    "es": ("🇪🇸 Español (ES)", "spanish"),
+    "fr": ("🇫🇷 Français (FR)", "french"),
+    "ja": ("🇯🇵 日本語 (JA)", "japanese"),
+    "kk": ("🇰🇿 Қазақша (KK)", "kazakh"),
+    "uz": ("🇺🇿 O'zbekcha (UZ)", "uzbek")
 }
 
 async def translate_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -92,14 +93,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         translator = GoogleTranslator(source='auto', target=target_lang)
         
-        # Пытаемся определить язык
         detected_lang = None
         try:
             detected_lang = translator.detect(original_text)
         except Exception:
             pass
 
-        # Если язык совпадает с целевым — выводим предупреждение
         if detected_lang and (detected_lang.lower() == code.lower() or detected_lang.lower() == target_lang.lower()):
             await query.edit_message_text(f"⚠️ Этот текст уже написан на языке: {lang_label}")
             return
@@ -130,6 +129,6 @@ if __name__ == '__main__':
         application.add_handler(CommandHandler("tr", translate_menu))
         application.add_handler(CallbackQueryHandler(button_handler))
 
-        print("Бот-переводчик успешно запущен!")
+        print("Бот-переводчик с обновленным меню запущен!")
         application.run_polling()
         

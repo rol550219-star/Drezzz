@@ -5,7 +5,6 @@ from threading import Thread
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from deep_translator import GoogleTranslator
-from deep_translator.exceptions import DetectLanguageException
 
 # Настройка логирования
 logging.basicConfig(
@@ -26,7 +25,7 @@ def run_web_server():
     server = HTTPServer(("0.0.0.0", port), SimpleHandler)
     server.serve_forever()
 
-# Словарь доступных языков (код: (название для кнопки, код для переводчика))
+# Словарь доступных языков
 LANGUAGES = {
     "en": ("🇬🇧 English", "english"),
     "uk": ("🇺🇦 Українська", "ukrainian"),
@@ -93,22 +92,21 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         translator = GoogleTranslator(source='auto', target=target_lang)
         
-        # Определяем исходный язык текста
+        # Пытаемся определить язык
+        detected_lang = None
         try:
             detected_lang = translator.detect(original_text)
         except Exception:
-            detected_lang = None
+            pass
 
-        # Проверяем, если язык совпадает с целевым
-        # (deep_translator возвращает короткие коды вроде 'en', 'uk', 'ru' или полные названия)
+        # Если язык совпадает с целевым — выводим предупреждение
         if detected_lang and (detected_lang.lower() == code.lower() or detected_lang.lower() == target_lang.lower()):
             await query.edit_message_text(f"⚠️ Этот текст уже написан на языке: {lang_label}")
             return
 
         translated = translator.translate(original_text)
         
-        # Защита, если переводчик вернул тот же текст
-        if translated.strip().lower() == original_text.strip().lower():
+        if not translated or translated.strip().lower() == original_text.strip().lower():
             await query.edit_message_text(f"⚠️ Этот текст уже на языке {lang_label}!")
             return
 
@@ -132,6 +130,6 @@ if __name__ == '__main__':
         application.add_handler(CommandHandler("tr", translate_menu))
         application.add_handler(CallbackQueryHandler(button_handler))
 
-        print("Бот-переводчик с защитой от одинакового языка запущен!")
+        print("Бот-переводчик успешно запущен!")
         application.run_polling()
         

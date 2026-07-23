@@ -14,7 +14,7 @@ logging.basicConfig(
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-# Простий веб-сервер, щоб Render бачив відкритий порт і не сварився
+# Веб-сервер для утримання порта Render
 class SimpleHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -39,7 +39,12 @@ LANGUAGES = {
     "uz": ("🇺🇿 O'zbekcha", "uzbek")
 }
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def translate_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Перевіряємо, чи це реплай на повідомлення
+    if not update.message.reply_to_message or not update.message.reply_to_message.text:
+        await update.message.reply_text("Зроби реплай (відповідь) на текстове повідомлення і напиши /tr!")
+        return
+
     keyboard = []
     row = []
     for code, (label, _) in LANGUAGES.items():
@@ -53,8 +58,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        "Привет! Я бот-переводчик с кнопками.\n"
-        "Сделай реплай (ответ) на нужное сообщение и выбери язык на клавиатуре ниже:",
+        "Вибери мову для перекладу:",
         reply_markup=reply_markup
     )
 
@@ -90,14 +94,14 @@ if __name__ == '__main__':
     if not TOKEN:
         print("Ошибка: BOT_TOKEN не найден!")
     else:
-        # Запускаем мини-сервер в фоновом потоке, чтобы Render был доволен портом
         t = Thread(target=run_web_server)
         t.daemon = True
         t.start()
 
         application = Application.builder().token(TOKEN).build()
 
-        application.add_handler(CommandHandler("start", start))
+        # Тепер використовуємо команду /tr для виклику кнопок
+        application.add_handler(CommandHandler("tr", translate_menu))
         application.add_handler(CallbackQueryHandler(button_handler))
 
         print("Бот-переводчик с кнопками успешно запущен!")

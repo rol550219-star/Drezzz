@@ -1,7 +1,9 @@
 import os
 import logging
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from threading import Thread
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from deep_translator import GoogleTranslator
 
 # Настройка логирования
@@ -12,7 +14,19 @@ logging.basicConfig(
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-# Словарь доступных языков и названий кнопок
+# Простий веб-сервер, щоб Render бачив відкритий порт і не сварився
+class SimpleHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is alive!")
+
+def run_web_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), SimpleHandler)
+    server.serve_forever()
+
+# Словарь доступных языков
 LANGUAGES = {
     "en": ("🇬🇧 English", "english"),
     "uk": ("🇺🇦 Українська", "ukrainian"),
@@ -26,11 +40,9 @@ LANGUAGES = {
 }
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Создаем клавиатуру с кнопками (по 3 штуки в ряду)
     keyboard = []
     row = []
     for code, (label, _) in LANGUAGES.items():
-        # В callback_data зашиваем префикс 'tr_' и код языка (например, 'tr_en')
         row.append(InlineKeyboardButton(label, callback_data=f"tr_{code}"))
         if len(row) == 3:
             keyboard.append(row)
@@ -46,12 +58,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=reply_markup
     )
 
-# Обработка нажатий на кнопки
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    # Проверяем, что нажата именно наша кнопка перевода
     if not query.data.startswith("tr_"):
         return
 
@@ -69,8 +79,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         translated = GoogleTranslator(source='auto', target=target_lang).translate(message.text)
-        
-        # Редактируем сообщение с кнопками на готовый перевод
         await query.edit_message_text(
             f"🌐 <b>Перевод ({lang_label}):</b>\n{translated}",
             parse_mode="HTML"
@@ -82,12 +90,15 @@ if __name__ == '__main__':
     if not TOKEN:
         print("Ошибка: BOT_TOKEN не найден!")
     else:
+        # Запускаем мини-сервер в фоновом потоке, чтобы Render был доволен портом
+        t = Thread(target=run_web_server)
+        t.daemon = True
+        t.start()
+
         application = Application.builder().token(TOKEN).build()
 
         application.add_handler(CommandHandler("start", start))
-        # Обработчик нажатий на инлайн-кнопки
         application.add_handler(CallbackQueryHandler(button_handler))
 
         print("Бот-переводчик с кнопками успешно запущен!")
         application.run_polling()
-    

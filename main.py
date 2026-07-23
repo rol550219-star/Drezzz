@@ -2,8 +2,8 @@ import os
 import logging
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from threading import Thread
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from deep_translator import GoogleTranslator
 
 # Настройка логирования
@@ -27,49 +27,72 @@ def run_web_server():
 
 # Словарь доступных языков
 LANGUAGES = {
-    "en": "english",
-    "uk": "ukrainian",
-    "ru": "russian",
-    "pl": "polish",
-    "de": "german",
-    "es": "spanish",
-    "fr": "french",
-    "kk": "kazakh",
-    "uz": "uzbek"
+    "en": ("🇬🇧 English", "english"),
+    "uk": ("🇺🇦 Українська", "ukrainian"),
+    "ru": ("🇷🇺 Русский", "russian"),
+    "pl": ("🇵🇱 Polski", "polish"),
+    "de": ("🇩🇪 Deutsch", "german"),
+    "es": ("🇪🇸 Español", "spanish"),
+    "fr": ("🇫🇷 Français", "french"),
+    "kk": ("🇰🇿 Қазақша", "kazakh"),
+    "uz": ("🇺🇿 O'zbekcha", "uzbek")
 }
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Привет! Я бот-переводчик.\n"
-        "Сделай реплай на сообщение другого человека и напиши код языка (например: `ru`, `en`, `kk`, `uz`, `uk`), чтобы перевести его.",
-        parse_mode="Markdown"
-    )
-
-async def translate_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    message = update.message
-    
+async def translate_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Проверяем, есть ли реплай на сообщение другого человека
-    if not message.reply_to_message or not message.reply_to_message.text:
+    if not update.message.reply_to_message or not update.message.reply_to_message.text:
+        await update.message.reply_text("Сделай реплай на сообщение и напиши /tr!")
         return
 
-    # Получаем текст команды (например, 'ru' из сообщения или '/ru')
-    text_input = message.text.strip().lower().lstrip('/')
+    keyboard = []
+    row = []
+    for code, (label, _) in LANGUAGES.items():
+        # Создаем кнопку, которая вызывает callback
+        row.append(InlineKeyboardButton(label, callback_data=f"tr_{code}"))
+        if len(row) == 3:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+        
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        "Выбери язык для перевода:",
+        reply_markup=reply_markup
+    )
 
-    if text_input not in LANGUAGES:
-        return  # Если это не код языка, ничего не делаем
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    if not query.data.startswith("tr_"):
+        return
 
-    # Текст того сообщения, НА КОТОРОЕ сделали реплай
-    original_text = message.reply_to_message.text
-    target_lang = LANGUAGES[text_input]
+    code = query.data.split("_")[1]
+    if code not in LANGUAGES:
+        return
+
+    # Берем сообщение, на которое изначально была вызвана команда /tr
+    bot_message = query.message
+    if not bot_message.reply_to_message or not bot_message.reply_to_message.reply_to_message:
+        await query.edit_message_text("Ошибка: исходное сообщение не найдено.")
+        return
+
+    # Достаем текст именно того сообщения, на которое ответили реплаем
+    original_text = bot_message.reply_to_message.reply_to_message.text
+
+    target_lang = LANGUAGES[code][1]
+    lang_label = LANGUAGES[code][0]
 
     try:
         translated = GoogleTranslator(source='auto', target=target_lang).translate(original_text)
-        await message.reply_text(
-            f"🌐 <b>Перевод ({text_input.upper()}):</b>\n{translated}",
+        await query.edit_message_text(
+            f"🌐 <b>Перевод ({lang_label}):</b>\n{translated}",
             parse_mode="HTML"
         )
     except Exception as e:
-        await message.reply_text(f"Ошибка при переводе: {e}")
+        await query.edit_message_text(f"Ошибка при переводе: {e}")
 
 if __name__ == '__main__':
     if not TOKEN:
@@ -81,10 +104,9 @@ if __name__ == '__main__':
 
         application = Application.builder().token(TOKEN).build()
 
-        application.add_handler(CommandHandler("start", start))
-        # Перехватываем любые сообщения, состоящие из двух букв (коды языков вроде ru, en, kk, uz)
-        application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"^/?[a-zA-Z]{2}$"), translate_message))
+        application.add_handler(CommandHandler("tr", translate_menu))
+        application.add_handler(CallbackQueryHandler(button_handler))
 
-        print("Бот-переводчик запущен и работает идеально!")
+        print("Бот-переводчик с кнопками успешно запущен!")
         application.run_polling()
-    
+                         

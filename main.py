@@ -25,6 +25,7 @@ def run_web_server():
     server = HTTPServer(("0.0.0.0", port), SimpleHandler)
     server.serve_forever()
 
+# Словарь доступных языков
 LANGUAGES = {
     "en": ("🇬🇧 English", "english"),
     "uk": ("🇺🇦 Українська", "ukrainian"),
@@ -38,8 +39,9 @@ LANGUAGES = {
 }
 
 async def translate_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Проверяем, есть ли реплай на сообщение
     if not update.message.reply_to_message or not update.message.reply_to_message.text:
-        await update.message.reply_text("сделай реплей на комментарий и напиши /tr!")
+        await update.message.reply_text("Сделай реплай на сообщение другого человека и напиши /tr!")
         return
 
     keyboard = []
@@ -54,7 +56,7 @@ async def translate_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    # Виводимо меню вибору мови у відповідь на команду /tr
+    # Отправляем кнопки в ответ на команду
     await update.message.reply_text(
         "Выбери язык для перевода:",
         reply_markup=reply_markup
@@ -71,24 +73,26 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if code not in LANGUAGES:
         return
 
-    # ОТУТ ГОЛОВНА ЗМІНА: беремо текст з повідомлення, НА ЯКЕ зробили реплай
-    original_message = query.message.reply_to_message.reply_to_message
-    
-    if not original_message or not original_message.text:
-        await query.edit_message_text("Ошибка")
+    # Ищем оригинальное сообщение через родительское сообщение с кнопками
+    reply_to_bot_msg = query.message.reply_to_message
+    if not reply_to_bot_msg or not reply_to_bot_msg.reply_to_message:
+        await query.edit_message_text("Ошибка: не удалось найти исходное сообщение.")
         return
+
+    # Текст сообщения, на которое изначально сделали реплай с командой /tr
+    original_text = reply_to_bot_msg.reply_to_message.text
 
     target_lang = LANGUAGES[code][1]
     lang_label = LANGUAGES[code][0]
 
     try:
-        translated = GoogleTranslator(source='auto', target=target_lang).translate(original_message.text)
+        translated = GoogleTranslator(source='auto', target=target_lang).translate(original_text)
         await query.edit_message_text(
-            f"🌐 <b>Переклад ({lang_label}):</b>\n{translated}",
+            f"🌐 <b>Перевод ({lang_label}):</b>\n{translated}",
             parse_mode="HTML"
         )
     except Exception as e:
-        await query.edit_message_text(f"Помилка при перекладі: {e}")
+        await query.edit_message_text(f"Ошибка при переводе: {e}")
 
 if __name__ == '__main__':
     if not TOKEN:
@@ -105,4 +109,4 @@ if __name__ == '__main__':
 
         print("Бот-переводчик с кнопками успешно запущен!")
         application.run_polling()
-        
+    

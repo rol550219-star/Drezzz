@@ -39,7 +39,7 @@ LANGUAGES = {
 
 async def translate_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message or not update.message.reply_to_message.text:
-        await update.message.reply_text("Зроби реплай на текстове повідомлення і напиши /tr!")
+        await update.message.reply_text("сделай реплей на комментарий и напиши /tr!")
         return
 
     keyboard = []
@@ -56,7 +56,7 @@ async def translate_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Виводимо меню вибору мови у відповідь на команду /tr
     await update.message.reply_text(
-        "Вибери мову для перекладу:",
+        "Выбери язык для перевода:",
         reply_markup=reply_markup
     )
 
@@ -75,7 +75,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     original_message = query.message.reply_to_message.reply_to_message
     
     if not original_message or not original_message.text:
-        await query.edit_message_text("Помилка: оригінальне повідомлення не знайдено.")
+        await query.edit_message_text("Ошибка")
         return
 
     target_lang = LANGUAGES[code][1]
@@ -105,49 +105,4 @@ if __name__ == '__main__':
 
         print("Бот-переводчик с кнопками успешно запущен!")
         application.run_polling()
-        )
-
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    
-    if not query.data.startswith("tr_"):
-        return
-
-    code = query.data.split("_")[1]
-    if code not in LANGUAGES:
-        return
-
-    message = query.message.reply_to_message
-    if not message or not message.text:
-        await query.edit_message_text("Ошибка: исходное сообщение не найдено или оно пустое.")
-        return
-
-    target_lang = LANGUAGES[code][1]
-    lang_label = LANGUAGES[code][0]
-
-    try:
-        translated = GoogleTranslator(source='auto', target=target_lang).translate(message.text)
-        await query.edit_message_text(
-            f"🌐 <b>Перевод ({lang_label}):</b>\n{translated}",
-            parse_mode="HTML"
-        )
-    except Exception as e:
-        await query.edit_message_text(f"Ошибка при переводе: {e}")
-
-if __name__ == '__main__':
-    if not TOKEN:
-        print("Ошибка: BOT_TOKEN не найден!")
-    else:
-        t = Thread(target=run_web_server)
-        t.daemon = True
-        t.start()
-
-        application = Application.builder().token(TOKEN).build()
-
-        # Тепер використовуємо команду /tr для виклику кнопок
-        application.add_handler(CommandHandler("tr", translate_menu))
-        application.add_handler(CallbackQueryHandler(button_handler))
-
-        print("Бот-переводчик с кнопками успешно запущен!")
-        application.run_polling()
+        

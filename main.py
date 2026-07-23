@@ -39,21 +39,16 @@ LANGUAGES = {
 }
 
 async def translate_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Проверяем, есть ли реплай на сообщение
     if not update.message.reply_to_message or not update.message.reply_to_message.text:
         await update.message.reply_text("Сделай реплай на сообщение и напиши /tr!")
         return
 
-    # Берем текст сообщения, которое нужно перевести
     original_text = update.message.reply_to_message.text
-    
-    # Обрезаем текст для кнопки, если он слишком длинный (Telegram разрешает до 64 байт в callback_data)
     safe_text = original_text[:30].replace("_", " ")
 
     keyboard = []
     row = []
     for code, (label, _) in LANGUAGES.items():
-        # Зашиваем код языка и сам текст прямо в кнопку!
         callback_data = f"tr_{code}_{safe_text}"
         row.append(InlineKeyboardButton(label, callback_data=callback_data))
         if len(row) == 3:
@@ -81,12 +76,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if code not in LANGUAGES:
         return
 
-    # Достаем точный исходный текст из реплая к сообщению, на которое вызвали /tr
     bot_message = query.message
     if bot_message.reply_to_message and bot_message.reply_to_message.reply_to_message:
         original_text = bot_message.reply_to_message.reply_to_message.text
     else:
-        # Запасной вариант, если ланцюжок не найден — берем из callback_data
         original_text = data_parts[2] if len(data_parts) > 2 else ""
 
     if not original_text:
@@ -120,4 +113,4 @@ if __name__ == '__main__':
 
         print("Бот-переводчик с надежными кнопками успешно запущен!")
         application.run_polling()
-    
+        
